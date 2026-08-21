@@ -9,6 +9,8 @@ import torch
 
 def seed_everything(seed: int, deterministic: bool = True) -> None:
     os.environ["PYTHONHASHSEED"] = str(seed)
+    if deterministic:
+        os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -27,4 +29,3 @@ def resolve_device(requested: str) -> torch.device:
     if device.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but is not available in this environment")
     return device
-

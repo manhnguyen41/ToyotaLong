@@ -21,6 +21,8 @@ Các chế độ:
 
 Progress bar dùng `tqdm` và mặc định hiển thị trial, rolling block, epoch, batch train và batch dự báo. Có thể tắt toàn bộ bằng `progress.enabled: false`, hoặc tắt riêng `batches`, `epochs`, `rolling_blocks`, `predictions` trong `configs/base.yaml`. Progress trial Optuna được điều khiển bởi `tuning.progress_bar`.
 
+Package tự đặt `CUBLAS_WORKSPACE_CONFIG=:4096:8` trước khi khởi tạo CUDA để chế độ deterministic hoạt động với cuBLAS. Nếu hệ thống đã đặt biến này, giá trị của hệ thống được giữ nguyên.
+
 ## Setup
 
 Python 3.10+ is required. On the training machine, install a CUDA-enabled PyTorch build appropriate for its driver first, then install this package:
