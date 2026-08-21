@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "service-parts-forecasting"
+version = "0.1.0"
+description = "Extensible global forecasting models for monthly service-parts demand"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.24",
+  "openpyxl>=3.1",
+  "pandas>=2.0",
+  "PyYAML>=6.0",
+  "torch>=2.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4"]
+tuning = ["optuna>=4.0"]
+
+[project.scripts]
+spf-inspect = "service_parts_forecasting.cli.inspect_data:main"
+spf-train = "service_parts_forecasting.cli.train:main"
+spf-evaluate = "service_parts_forecasting.cli.evaluate:main"
+spf-compare-baseline = "service_parts_forecasting.cli.compare_baseline:main"
+spf-tune = "service_parts_forecasting.cli.tune:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

@@ -1,0 +1,35 @@
+seed: 52
+seeds: [52]
+device: auto
+batch_size: 256
+num_workers: 4
+epochs: 100
+final_epochs: 100
+context_length: 12
+prediction_length: 4
+calendar_features: false
+normalizer: mean_scale
+normalization_lookback: 12
+metric_epsilon: 1.0e-8
+gradient_clip_norm: 1.0
+warm_start: false
+output_dir: outputs
+
+optimizer:
+  name: adamw
+  learning_rate: 0.001
+  weight_decay: 0.0001
+
+scheduler:
+  name: reduce_on_plateau
+  patience: 5
+  factor: 0.5
+
+early_stopping:
+  enabled: true
+  patience: 10
+  min_delta: 0.0
+
+loss:
+  name: normalized_mae
+

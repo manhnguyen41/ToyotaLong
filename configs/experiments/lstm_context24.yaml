@@ -1,0 +1,4 @@
+defaults:
+  - ../lstm.yaml
+context_length: 24
+
