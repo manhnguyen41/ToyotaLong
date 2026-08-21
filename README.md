@@ -14,6 +14,7 @@ Các chế độ:
 
 - `MODE = "tune_smoke"`: kiểm tra nhanh tuning với hai trial và 32 phụ tùng.
 - `MODE = "tune"`: tuning đầy đủ với số trial trong `N_TRIALS`.
+- `MODE = "import_trials"`: import full run in-memory gần nhất vào SQLite để resume.
 - `MODE = "validation"`: train và đánh giá cấu hình `TRAIN_CONFIG` trên validation.
 - `MODE = "test"`: đánh giá cấu hình `TRAIN_CONFIG` trên test; hãy trỏ biến này tới `best_config.yaml` sau tuning.
 
@@ -22,6 +23,8 @@ Các chế độ:
 Progress bar dùng `tqdm` và mặc định hiển thị trial, rolling block, epoch, batch train và batch dự báo. Có thể tắt toàn bộ bằng `progress.enabled: false`, hoặc tắt riêng `batches`, `epochs`, `rolling_blocks`, `predictions` trong `configs/base.yaml`. Progress trial Optuna được điều khiển bởi `tuning.progress_bar`.
 
 Package tự đặt `CUBLAS_WORKSPACE_CONFIG=:4096:8` trước khi khởi tạo CUDA để chế độ deterministic hoạt động với cuBLAS. Nếu hệ thống đã đặt biến này, giá trị của hệ thống được giữ nguyên.
+
+Nếu một tuning run cũ dùng in-memory storage, đặt `MODE = "import_trials"` trong `main.py`. Runner tự tìm full `tuning_results.csv` mới nhất (bỏ qua smoke), import idempotent vào `OPTUNA_STORAGE`, và giữ nguyên distributions, score cùng selected epochs. Sau đó đặt `MODE = "tune"`, `N_TRIALS` bằng số trial muốn chạy thêm. Có thể chỉ định thủ công file cũ qua `IMPORT_RESULTS`.
 
 ## Setup
 

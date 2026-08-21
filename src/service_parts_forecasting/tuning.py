@@ -39,6 +39,143 @@ def _set_nested(config: dict[str, Any], dotted_key: str, value: Any) -> None:
     target[keys[-1]] = value
 
 
+def _ensure_sqlite_parent(storage: str | None) -> None:
+    if storage and storage.startswith("sqlite:///"):
+        database_path = Path(storage.removeprefix("sqlite:///"))
+        database_path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def _coerce_imported_parameter(value: Any, specification: dict[str, Any]) -> Any:
+    kind = str(specification.get("type", "categorical"))
+    if kind == "int":
+        return int(value)
+    if kind == "float":
+        return float(value)
+    choices = list(specification.get("choices", []))
+    for choice in choices:
+        if value == choice or str(value) == str(choice):
+            return choice
+        if isinstance(choice, (int, float)):
+            try:
+                if float(value) == float(choice):
+                    return choice
+            except (TypeError, ValueError):
+                pass
+    raise ValueError(f"Imported categorical value {value!r} is not in choices {choices!r}")
+
+
+def import_completed_trials(
+    results_path: str | Path,
+    config: dict[str, Any],
+    *,
+    storage: str,
+) -> dict[str, Any]:
+    """Import completed CSV trials into a persistent Optuna study, idempotently."""
+    try:
+        import optuna
+    except ImportError as exc:
+        raise RuntimeError('Optuna is required; install with pip install -e ".[tuning]"') from exc
+    source = Path(results_path).resolve()
+    if not source.is_file():
+        raise FileNotFoundError(f"Tuning results not found: {source}")
+    if not storage:
+        raise ValueError("A non-empty Optuna storage URL is required for import")
+    if "tuning" not in config:
+        raise ValueError("Config has no 'tuning' section")
+    tuning_config = config["tuning"]
+    search_space = tuning_config.get("search_space", {})
+    _ensure_sqlite_parent(storage)
+    sampler = optuna.samplers.TPESampler(seed=int(tuning_config.get("sampler_seed", 52)))
+    study = optuna.create_study(
+        study_name=str(tuning_config.get("study_name", "global_lstm_validation")),
+        direction=str(tuning_config.get("direction", "minimize")),
+        sampler=sampler,
+        storage=storage,
+        load_if_exists=True,
+    )
+    source_key = str(source)
+    imported_numbers = {
+        int(trial.user_attrs["original_trial_number"])
+        for trial in study.trials
+        if trial.user_attrs.get("import_source") == source_key
+        and "original_trial_number" in trial.user_attrs
+    }
+    frame = pd.read_csv(source)
+    required = {"trial", "state", "value"}
+    missing = required - set(frame.columns)
+    if missing:
+        raise ValueError(f"Tuning CSV is missing columns: {sorted(missing)}")
+    imported = 0
+    skipped = 0
+    for row in frame.to_dict(orient="records"):
+        original_number = int(row["trial"])
+        if str(row["state"]).upper() != "COMPLETE" or not np.isfinite(float(row["value"])):
+            skipped += 1
+            continue
+        if original_number in imported_numbers:
+            skipped += 1
+            continue
+        params: dict[str, Any] = {}
+        distributions: dict[str, Any] = {}
+        for name, specification in search_space.items():
+            column = f"param_{name}"
+            if column not in row or pd.isna(row[column]):
+                raise ValueError(f"Trial {original_number} is missing parameter {name!r}")
+            params[name] = _coerce_imported_parameter(row[column], specification)
+            kind = str(specification.get("type", "categorical"))
+            if kind == "categorical":
+                distributions[name] = optuna.distributions.CategoricalDistribution(
+                    list(specification["choices"])
+                )
+            elif kind == "int":
+                distributions[name] = optuna.distributions.IntDistribution(
+                    low=int(specification["low"]),
+                    high=int(specification["high"]),
+                    step=int(specification.get("step", 1)),
+                    log=bool(specification.get("log", False)),
+                )
+            elif kind == "float":
+                step = specification.get("step")
+                distributions[name] = optuna.distributions.FloatDistribution(
+                    low=float(specification["low"]),
+                    high=float(specification["high"]),
+                    step=None if step is None else float(step),
+                    log=bool(specification.get("log", False)),
+                )
+            else:
+                raise ValueError(f"Unsupported search-space type {kind!r}")
+        user_attrs: dict[str, Any] = {
+            "import_source": source_key,
+            "original_trial_number": original_number,
+        }
+        for column, value in row.items():
+            if column.startswith("attr_") and not pd.isna(value):
+                key = column.removeprefix("attr_")
+                if key == "suggested_final_epochs":
+                    value = int(value)
+                user_attrs[key] = value
+        frozen = optuna.trial.create_trial(
+            state=optuna.trial.TrialState.COMPLETE,
+            value=float(row["value"]),
+            params=params,
+            distributions=distributions,
+            user_attrs=user_attrs,
+        )
+        study.add_trial(frozen)
+        imported_numbers.add(original_number)
+        imported += 1
+    return {
+        "study_name": study.study_name,
+        "storage": storage,
+        "source": source_key,
+        "imported": imported,
+        "skipped": skipped,
+        "total_trials_in_study": len(study.trials),
+        "best_trial": study.best_trial.number if study.trials else None,
+        "best_value": study.best_value if study.trials else None,
+    }
+
+
 def sample_search_space(
     trial: TrialLike, base_config: dict[str, Any], search_space: dict[str, dict[str, Any]]
 ) -> dict[str, Any]:
@@ -136,6 +273,7 @@ def run_tuning(
     else:
         raise ValueError("tuning.sampler must be 'tpe' or 'random'")
     storage = storage_override if storage_override is not None else tuning_config.get("storage")
+    _ensure_sqlite_parent(storage)
     study = optuna.create_study(
         study_name=study_name,
         direction=str(tuning_config.get("direction", "minimize")),

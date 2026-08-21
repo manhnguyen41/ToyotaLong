@@ -27,6 +27,7 @@ spf-train = "service_parts_forecasting.cli.train:main"
 spf-evaluate = "service_parts_forecasting.cli.evaluate:main"
 spf-compare-baseline = "service_parts_forecasting.cli.compare_baseline:main"
 spf-tune = "service_parts_forecasting.cli.tune:main"
+spf-import-tuning = "service_parts_forecasting.cli.import_tuning:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
