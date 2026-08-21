@@ -202,6 +202,8 @@ def run_tuning(
         timeout=None if timeout is None else float(timeout),
         n_jobs=int(tuning_config.get("n_jobs", 1)),
         gc_after_trial=True,
+        show_progress_bar=bool(tuning_config.get("progress_bar", True))
+        and int(tuning_config.get("n_jobs", 1)) == 1,
     )
     if not study.best_trial:
         raise RuntimeError("Tuning completed without a successful trial")
@@ -244,4 +246,3 @@ def run_tuning(
     }
     (study_dir / "tuning_summary.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
     return study_dir, result
-

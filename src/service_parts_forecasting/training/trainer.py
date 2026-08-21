@@ -8,6 +8,7 @@ import numpy as np
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
 
 from .checkpointing import load_model_checkpoint, save_checkpoint
 from .losses import make_loss
@@ -81,16 +82,38 @@ class Trainer:
         patience = int(early.get("patience", 10))
         min_delta = float(early.get("min_delta", 0.0))
         clip_norm = float(self.config.get("gradient_clip_norm", 1.0))
+        progress = self.config.get("progress", {})
+        progress_enabled = bool(progress.get("enabled", False))
+        show_epochs = progress_enabled and bool(progress.get("epochs", True))
+        show_batches = progress_enabled and bool(progress.get("batches", True))
+        leave = bool(progress.get("leave", False))
 
         best_loss = np.inf
         best_epoch = 0
         stale_epochs = 0
         history: list[dict[str, float | int | str]] = []
-        for epoch in range(1, epochs + 1):
+        epoch_iterator = tqdm(
+            range(1, epochs + 1),
+            desc=phase,
+            unit="epoch",
+            dynamic_ncols=True,
+            leave=leave,
+            disable=not show_epochs,
+        )
+        for epoch in epoch_iterator:
             model.train()
             total_loss = 0.0
             total_items = 0
-            for batch in train_loader:
+            batch_iterator = tqdm(
+                train_loader,
+                total=len(train_loader),
+                desc=f"{phase} {epoch}/{epochs}",
+                unit="batch",
+                dynamic_ncols=True,
+                leave=False,
+                disable=not show_batches,
+            )
+            for batch in batch_iterator:
                 inputs = batch["input"].to(self.device)
                 targets = batch["target_normalized"].to(self.device)
                 optimizer.zero_grad(set_to_none=True)
@@ -104,6 +127,8 @@ class Trainer:
                 batch_size = inputs.shape[0]
                 total_loss += float(loss.item()) * batch_size
                 total_items += batch_size
+                if show_batches:
+                    batch_iterator.set_postfix(loss=f"{loss.item():.5f}", refresh=False)
             train_loss = total_loss / max(total_items, 1)
             validation_loss = (
                 self._loader_loss(model, validation_loader) if validation_loader is not None else train_loss
@@ -120,6 +145,10 @@ class Trainer:
                     "learning_rate": current_lr,
                 }
             )
+            if show_epochs:
+                epoch_iterator.set_postfix(
+                    train=f"{train_loss:.5f}", val=f"{validation_loss:.5f}", refresh=False
+                )
             if validation_loader is None:
                 # Fixed-epoch final fits always use the requested last epoch.
                 best_loss = validation_loss

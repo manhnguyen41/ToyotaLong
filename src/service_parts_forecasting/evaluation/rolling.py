@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
 
 from service_parts_forecasting.data.dataset import (
     ForecastOriginDataset,
@@ -137,8 +138,21 @@ def _predict_origin(
     )
     model.eval()
     rows: list[dict[str, Any]] = []
+    progress = config.get("progress", {})
+    show_predictions = bool(progress.get("enabled", False)) and bool(
+        progress.get("predictions", True)
+    )
+    prediction_loader = _loader(dataset, config, shuffle=False)
     with torch.inference_mode():
-        for batch in _loader(dataset, config, shuffle=False):
+        for batch in tqdm(
+            prediction_loader,
+            total=len(prediction_loader),
+            desc=f"forecast {stage} s{seed} b{origin.block}",
+            unit="batch",
+            dynamic_ncols=True,
+            leave=False,
+            disable=not show_predictions,
+        ):
             normalized = model(batch["input"].to(device)).cpu()
             raw = normalizer.inverse_target(normalized, batch["scale"])
             for sample_index, part_id in enumerate(batch["part_id"]):
@@ -175,11 +189,25 @@ def run_rolling_experiment(
     all_predictions: list[dict[str, Any]] = []
     all_history: list[dict[str, Any]] = []
     logs: list[str] = []
+    progress = config.get("progress", {})
+    show_blocks = bool(progress.get("enabled", False)) and bool(
+        progress.get("rolling_blocks", True)
+    )
     for seed_value in config.get("seeds", [config.get("seed", 52)]):
         seed = int(seed_value)
         seed_everything(seed)
         warm_state: dict[str, torch.Tensor] | None = None
-        for origin in origins:
+        origin_iterator = tqdm(
+            origins,
+            desc=f"rolling {stage} seed={seed}",
+            unit="block",
+            dynamic_ncols=True,
+            leave=bool(progress.get("leave", False)),
+            disable=not show_blocks,
+        )
+        for origin in origin_iterator:
+            if show_blocks:
+                origin_iterator.set_postfix(block=origin.block, origin=origin.history_end.strftime("%Y-%m"))
             model, history, selected_epochs = _train_model_at_origin(
                 data,
                 origin,

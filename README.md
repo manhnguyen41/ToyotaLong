@@ -19,6 +19,8 @@ Các chế độ:
 
 `main.py` tự nhận đường dẫn workbook trong thư mục `data` và tự thêm thư mục `src` vào Python path. Bạn vẫn cần cài các thư viện bằng `pip install -e ".[tuning]"` một lần trong môi trường Conda.
 
+Progress bar dùng `tqdm` và mặc định hiển thị trial, rolling block, epoch, batch train và batch dự báo. Có thể tắt toàn bộ bằng `progress.enabled: false`, hoặc tắt riêng `batches`, `epochs`, `rolling_blocks`, `predictions` trong `configs/base.yaml`. Progress trial Optuna được điều khiển bởi `tuning.progress_bar`.
+
 ## Setup
 
 Python 3.10+ is required. On the training machine, install a CUDA-enabled PyTorch build appropriate for its driver first, then install this package:

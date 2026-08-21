@@ -12,6 +12,7 @@ tuning:
   n_jobs: 1
   timeout_seconds: null
   storage: null  # Example for resume: sqlite:///outputs/tuning/global_lstm_validation.db
+  progress_bar: true
   tuning_seeds: [52]
   final_seeds: [52, 62, 72, 82, 92]
 
@@ -40,4 +41,3 @@ tuning:
     batch_size:
       type: categorical
       choices: [128, 256, 512]
-
