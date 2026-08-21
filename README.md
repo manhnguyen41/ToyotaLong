@@ -2,6 +2,23 @@
 
 Reproducible PyTorch implementation of a **single global LSTM** for all 8,605 service parts. It uses causal per-window mean scaling and direct four-month forecasts. Validation and test each use three rolling four-month blocks; only observed ground truth is revealed between blocks.
 
+## Chạy đơn giản bằng `main.py`
+
+Nếu không muốn dùng câu lệnh CLI dài, mở `main.py`, chỉnh biến `MODE` ở đầu file rồi chạy:
+
+```bash
+python main.py
+```
+
+Các chế độ:
+
+- `MODE = "tune_smoke"`: kiểm tra nhanh tuning với hai trial và 32 phụ tùng.
+- `MODE = "tune"`: tuning đầy đủ với số trial trong `N_TRIALS`.
+- `MODE = "validation"`: train và đánh giá cấu hình `TRAIN_CONFIG` trên validation.
+- `MODE = "test"`: đánh giá cấu hình `TRAIN_CONFIG` trên test; hãy trỏ biến này tới `best_config.yaml` sau tuning.
+
+`main.py` tự nhận đường dẫn workbook trong thư mục `data` và tự thêm thư mục `src` vào Python path. Bạn vẫn cần cài các thư viện bằng `pip install -e ".[tuning]"` một lần trong môi trường Conda.
+
 ## Setup
 
 Python 3.10+ is required. On the training machine, install a CUDA-enabled PyTorch build appropriate for its driver first, then install this package:
